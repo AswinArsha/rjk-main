@@ -1,15 +1,26 @@
-import React from 'react';
-import ActionButtons from './ActionButtons';
+// src\widgets\CustomerTable.js
+import React from "react";
+import ActionButtons from "./ActionButtons";
 
-const CustomerTable = ({ pointsData, onEdit, onDelete, onClaim, onAddGrams }) => {
+const CustomerTable = ({
+  pointsData,
+  onEdit,
+  onDelete,
+  onClaim,
+  onAddGrams,
+}) => {
   if (!pointsData || pointsData.length === 0) {
-    return <div>No data available</div>; // Early return if no data
+    return <div className="text-gray-500 p-4">No data available</div>; // Improved "No data" message
   }
 
   return (
-    <div className="overflow-x-auto bg-white border border-gray-200 rounded-lg">
+    <div className="overflow-x-auto bg-white border border-gray-200 rounded-lg ">
+      {" "}
+      {/* Consistent padding */}
       <table className="min-w-full divide-y divide-gray-200 text-sm">
-        <thead className="bg-slate-300 text-left">
+        <thead className="bg-gray-300 text-left">
+          {" "}
+          {/* Improved table header styling */}
           <tr>
             {[
               "CUSTOMER CODE",
@@ -24,7 +35,12 @@ const CustomerTable = ({ pointsData, onEdit, onDelete, onClaim, onAddGrams }) =>
               "LAST SALES DATE",
               "Action",
             ].map((header) => (
-              <th key={header} className="px-4 py-2 border-r border-gray-200 font-medium">
+              <th
+                key={header}
+                className="px-4 py-2 border-r border-white font-semibold"
+              >
+                {" "}
+                {/* Consistent borders */}
                 {header}
               </th>
             ))}
@@ -32,7 +48,10 @@ const CustomerTable = ({ pointsData, onEdit, onDelete, onClaim, onAddGrams }) =>
         </thead>
         <tbody className="divide-y divide-gray-200">
           {pointsData.map((point, index) => (
-            <tr key={point["CUSTOMER CODE"] || index} className="hover:bg-gray-100">
+            <tr
+              key={point["CUSTOMER CODE"] || index}
+              className="hover:bg-gray-100 transition-colors duration-150"
+            >
               {[
                 point["CUSTOMER CODE"],
                 point["ADDRESS1"],
@@ -47,9 +66,11 @@ const CustomerTable = ({ pointsData, onEdit, onDelete, onClaim, onAddGrams }) =>
               ].map((value, index) => (
                 <td
                   key={index}
-                  className={`px-4 py-2 ${index < 9 ? 'border-r border-gray-200' : ''}`}
+                  className={`px-4 py-2 ${
+                    index < 9 ? "border-r border-gray-200" : ""
+                  }`}
                 >
-                  {value || '0'} {/* Provide default value if undefined */}
+                  {value || "0"} {/* Default value if undefined */}
                 </td>
               ))}
 

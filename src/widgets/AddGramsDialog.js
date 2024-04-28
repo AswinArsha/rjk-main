@@ -1,12 +1,61 @@
-import React, { useState } from 'react';
-import { Dialog, Transition } from '@headlessui/react';
-import { Fragment } from 'react';
+import React, { useState } from "react";
+import { Dialog, Transition } from "@headlessui/react";
+import { Fragment } from "react";
+import { supabase } from "../supabase"; // Import Supabase instance
+import { FaTimes } from "react-icons/fa"; // Icon for close button
 
-const AddGramsDialog = ({ isOpen, onClose, onConfirm }) => {
-  const [grams, setGrams] = useState('');
+const AddGramsDialog = ({
+  isOpen,
+  customer,
+  onClose,
+  onConfirm,
+  onDataUpdate,
+}) => {
+  const [grams, setGrams] = useState("");
 
   const handleInputChange = (e) => {
     setGrams(e.target.value);
+  };
+
+  const handleConfirm = async () => {
+    const gramsValue = parseFloat(grams); // Ensure the input is a float
+    if (isNaN(gramsValue) || gramsValue <= 0) {
+      alert("Please enter a valid number of grams."); // Validation check
+      return;
+    }
+
+    const pointsToAdd = gramsValue / 10; // 10:1 conversion ratio
+
+    try {
+      const updatedCustomer = {
+        ...customer,
+        "TOTAL POINTS": (customer["TOTAL POINTS"] || 0) + pointsToAdd,
+        "UNCLAIMED POINTS": (customer["UNCLAIMED POINTS"] || 0) + pointsToAdd,
+      };
+
+      const { error } = await supabase
+        .from("points")
+        .update({
+          "TOTAL POINTS": updatedCustomer["TOTAL POINTS"],
+          "UNCLAIMED POINTS": updatedCustomer["UNCLAIMED POINTS"],
+        })
+        .eq("CUSTOMER CODE", customer["CUSTOMER CODE"]);
+
+      if (error) {
+        throw error;
+      }
+
+      if (onDataUpdate) {
+        onDataUpdate(updatedCustomer); // Update parent component
+      }
+
+      setGrams(""); // Reset the input
+      onConfirm(grams); // Notify parent component
+      onClose(); // Close the dialog
+    } catch (error) {
+      console.error("Error updating grams:", error.message);
+      alert("Error adding grams. Please try again.");
+    }
   };
 
   return (
@@ -42,7 +91,10 @@ const AddGramsDialog = ({ isOpen, onClose, onConfirm }) => {
                 >
                   Add Grams
                 </Dialog.Title>
+
                 <div className="mt-4 space-y-4">
+                  {" "}
+                  {/* Consistent spacing */}
                   <div className="text-gray-700">
                     <label className="block mb-1" htmlFor="gramsInput">
                       Grams to be Added
@@ -51,22 +103,25 @@ const AddGramsDialog = ({ isOpen, onClose, onConfirm }) => {
                       type="number"
                       value={grams}
                       onChange={handleInputChange}
-                      className="w-full h-10 px-3 text-base placeholder-gray-600 border rounded-lg focus:shadow-outline"
+                      className="w-full h-10 px-3 text-base placeholder-gray-600 border rounded-lg focus:shadow-outline focus:border-indigo-500"
                       id="gramsInput"
+                      placeholder="Enter amount of grams" // Clear placeholder
                     />
                   </div>
                 </div>
 
                 <div className="mt-6 flex justify-end gap-4">
+                  {" "}
+                  {/* Proper spacing */}
                   <button
-                    className="inline-block rounded bg-gray-50 px-4 py-2 text-center text-sm font-semibold text-gray-500 hover:bg-gray-100"
+                    className="inline-block rounded bg-gray-50 px-4 py-2 text-center text-sm font-semibold text-gray-500 hover:bg-gray-100 focus:shadow-outline"
                     onClick={onClose}
                   >
                     Cancel
                   </button>
                   <button
-                    className="inline-block rounded bg-yellow-600 px-4 py-2 text-center text-sm font-semibold text-white hover:bg-yellow-700"
-                    onClick={() => onConfirm(grams)}
+                    className="inline-block rounded bg-yellow-600 px-4 py-2 text-center text-sm font-semibold text-white transition duration-150 hover:bg-yellow-700"
+                    onClick={handleConfirm}
                   >
                     Confirm
                   </button>
