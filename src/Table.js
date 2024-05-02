@@ -1,3 +1,4 @@
+// Table.js
 import React, { useState, useEffect } from "react";
 import CustomerTable from "./widgets/CustomerTable";
 import DeleteDialog from "./widgets/DeleteDialog";
@@ -10,10 +11,11 @@ import DownloadButton from "./widgets/DownloadButton";
 import Alerts from "./widgets/Alerts";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+import { supabase } from "./supabase"; // Import the Supabase client
 
 const ITEMS_PER_PAGE = 10;
 
-const Table = ({ pointsData, handleClaim, handleDelete }) => {
+const Table = ({ pointsData, handleDelete }) => {
   const [points, setPoints] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [paginatedData, setPaginatedData] = useState([]);
@@ -90,14 +92,126 @@ const Table = ({ pointsData, handleClaim, handleDelete }) => {
     doc.save("points_table.pdf");
   };
 
-  const handleDataUpdate = (updatedCustomer) => {
-    const updatedPoints = points.map((point) => {
-      if (point["CUSTOMER CODE"] === updatedCustomer["CUSTOMER CODE"]) {
-        return updatedCustomer;
+  const handleDataUpdate = async (updatedCustomer) => {
+    try {
+      const { data, error } = await supabase
+        .from("points")
+        .select('"TOTAL POINTS"', '"UNCLAIMED POINTS"', "CLAIMED POINTS")
+        .eq('"CUSTOMER CODE"', updatedCustomer["CUSTOMER CODE"].toString())
+        .single();
+
+      if (error) {
+        console.error("Error fetching customer data:", error);
+        return;
       }
-      return point;
-    });
-    setPoints(updatedPoints); // Update the table with the new data
+
+      const {
+        "TOTAL POINTS": currentTotalPoints,
+        "UNCLAIMED POINTS": currentUnclaimedPoints,
+        "CLAIMED POINTS": currentClaimedPoints,
+      } = data;
+
+      const newTotalPoints =
+        currentTotalPoints + updatedCustomer["TOTAL POINTS"];
+      const newUnclaimedPoints =
+        currentUnclaimedPoints + updatedCustomer["UNCLAIMED POINTS"];
+      const newClaimedPoints =
+        currentUnclaimedPoints + updatedCustomer["CLAIMED POINTS"];
+
+      const { error: updateError } = await supabase
+        .from("points")
+        .update({
+          "TOTAL POINTS": newTotalPoints,
+          "UNCLAIMED POINTS": newUnclaimedPoints,
+        })
+        .eq('"CUSTOMER CODE"', updatedCustomer["CUSTOMER CODE"].toString());
+
+      if (updateError) {
+        console.error("Error updating customer data:", updateError);
+        return;
+      }
+
+      const updatedPoints = points.map((point) => {
+        if (point["CUSTOMER CODE"] === updatedCustomer["CUSTOMER CODE"]) {
+          return {
+            ...point,
+            "TOTAL POINTS": newTotalPoints,
+            "UNCLAIMED POINTS": newUnclaimedPoints,
+            "CLAIMED POINTS": newClaimedPoints,
+          };
+        }
+        return point;
+      });
+
+      setPoints(updatedPoints); // Update the table with the new data
+    } catch (error) {
+      console.error("Error updating customer data:", error);
+    }
+  };
+  const handleClaim = async (customer) => {
+    try {
+      console.log("Current claimed points:", currentClaimedPoints);
+
+      const { data, error } = await supabase
+        .from("points")
+        .select('"UNCLAIMED POINTS"', '"CLAIMED POINTS"')
+        .eq('"CUSTOMER CODE"', customer["CUSTOMER CODE"].toString())
+        .single();
+
+      if (error) {
+        console.error("Error fetching customer data:", error);
+        return;
+      }
+
+      const {
+        "UNCLAIMED POINTS": currentUnclaimedPoints,
+        "CLAIMED POINTS": currentClaimedPoints,
+      } = data;
+
+      // Check if there are unclaimed points available
+      if (currentUnclaimedPoints <= 0) {
+        handleAlert(
+          "No unclaimed points available for this customer.",
+          "error"
+        );
+        return;
+      }
+
+      const newClaimedPoints = currentClaimedPoints + 1;
+      const newUnclaimedPoints = currentUnclaimedPoints - 1;
+
+      const { error: updateError } = await supabase
+        .from("points")
+        .update({
+          "UNCLAIMED POINTS": newUnclaimedPoints,
+          "CLAIMED POINTS": newClaimedPoints,
+        })
+        .eq('"CUSTOMER CODE"', customer["CUSTOMER CODE"].toString());
+
+      if (updateError) {
+        console.error("Error updating customer data:", updateError);
+        return;
+      }
+
+      const updatedCustomer = {
+        ...customer,
+        "UNCLAIMED POINTS": newUnclaimedPoints,
+        "CLAIMED POINTS": newClaimedPoints,
+      };
+
+      const updatedPoints = points.map((point) => {
+        if (point["CUSTOMER CODE"] === updatedCustomer["CUSTOMER CODE"]) {
+          return updatedCustomer;
+        }
+        return point;
+      });
+
+      setPoints(updatedPoints); // Update the table with the new data
+      handleAlert("Points claimed successfully.", "success");
+    } catch (error) {
+      console.error("Error updating customer data:", error);
+      handleAlert("An error occurred while claiming points.", "error");
+    }
   };
 
   return (
@@ -155,19 +269,21 @@ const Table = ({ pointsData, handleClaim, handleDelete }) => {
       <ClaimDialog
         isOpen={isClaimDialogOpen}
         onClose={() => setIsClaimDialogOpen(false)}
-        onConfirmClaim={() => {
-          handleClaim(currentCustomer);
+        onConfirmClaim={(customer) => {
+          handleClaim(customer);
           setIsClaimDialogOpen(false);
         }}
+        customer={currentCustomer}
       />
 
       <AddGramsDialog
         isOpen={isAddGramsDialogOpen}
         onClose={() => setIsAddGramsDialogOpen(false)}
-        onConfirm={(grams) => {
-          console.log("Grams added");
+        onConfirm={(updatedCustomer) => {
+          handleDataUpdate(updatedCustomer);
           setIsAddGramsDialogOpen(false);
         }}
+        customer={currentCustomer}
       />
 
       <Edit

@@ -1,63 +1,71 @@
+// src\AddGramsDialog.js
 import React, { useState } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { Fragment } from "react";
 import { supabase } from "../supabase"; // Import Supabase instance
 import { FaTimes } from "react-icons/fa"; // Icon for close button
 
-const AddGramsDialog = ({
-  isOpen,
-  customer,
-  onClose,
-  onConfirm,
-  onDataUpdate,
-}) => {
+const AddGramsDialog = ({ isOpen, customer, onClose, onDataUpdate }) => {
   const [grams, setGrams] = useState("");
 
   const handleInputChange = (e) => {
     setGrams(e.target.value);
   };
-
   const handleConfirm = async () => {
-    const gramsValue = parseFloat(grams); // Ensure the input is a float
+    const gramsValue = parseFloat(grams);
     if (isNaN(gramsValue) || gramsValue <= 0) {
-      alert("Please enter a valid number of grams."); // Validation check
+      alert("Please enter a valid number of grams.");
       return;
     }
-
-    const pointsToAdd = gramsValue / 10; // 10:1 conversion ratio
-
+  
+    const pointsToAdd = gramsValue / 10;
+  
     try {
-      const updatedCustomer = {
-        ...customer,
-        "TOTAL POINTS": (customer["TOTAL POINTS"] || 0) + pointsToAdd,
-        "UNCLAIMED POINTS": (customer["UNCLAIMED POINTS"] || 0) + pointsToAdd,
-      };
-
-      const { error } = await supabase
+      const { data: customerData, error } = await supabase
         .from("points")
-        .update({
-          "TOTAL POINTS": updatedCustomer["TOTAL POINTS"],
-          "UNCLAIMED POINTS": updatedCustomer["UNCLAIMED POINTS"],
-        })
-        .eq("CUSTOMER CODE", customer["CUSTOMER CODE"]);
-
+        .select('"TOTAL POINTS"', '"UNCLAIMED POINTS"', '"CLAIMED POINTS"')
+        .eq('"CUSTOMER CODE"', customer["CUSTOMER CODE"])
+        .single();
+  
       if (error) {
         throw error;
       }
-
-      if (onDataUpdate) {
-        onDataUpdate(updatedCustomer); // Update parent component
+  
+      const updatedTotalPoints = (customerData["TOTAL POINTS"] || 0) + pointsToAdd;
+      const updatedClaimedPoints = (customerData["CLAIMED POINTS"] || 0);
+      const updatedUnclaimedPoints = updatedTotalPoints - updatedClaimedPoints;
+  
+      const { error: updateError } = await supabase
+        .from("points")
+        .update({
+          "TOTAL POINTS": updatedTotalPoints,
+          "UNCLAIMED POINTS": updatedUnclaimedPoints,
+          "CLAIMED POINTS": updatedClaimedPoints,
+        })
+        .eq('"CUSTOMER CODE"', customer["CUSTOMER CODE"]);
+  
+      if (updateError) {
+        throw updateError;
       }
-
-      setGrams(""); // Reset the input
-      onConfirm(grams); // Notify parent component
-      onClose(); // Close the dialog
+  
+      const updatedCustomer = {
+        ...customer,
+        "TOTAL POINTS": updatedTotalPoints,
+        "UNCLAIMED POINTS": updatedUnclaimedPoints,
+        "CLAIMED POINTS": updatedClaimedPoints,
+      };
+  
+      if (onDataUpdate) {
+        onDataUpdate(updatedCustomer);
+      }
+  
+      setGrams("");
+      onClose();
     } catch (error) {
       console.error("Error updating grams:", error.message);
       alert("Error adding grams. Please try again.");
     }
   };
-
   return (
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-10" onClose={onClose}>
@@ -93,8 +101,6 @@ const AddGramsDialog = ({
                 </Dialog.Title>
 
                 <div className="mt-4 space-y-4">
-                  {" "}
-                  {/* Consistent spacing */}
                   <div className="text-gray-700">
                     <label className="block mb-1" htmlFor="gramsInput">
                       Grams to be Added
@@ -105,14 +111,12 @@ const AddGramsDialog = ({
                       onChange={handleInputChange}
                       className="w-full h-10 px-3 text-base placeholder-gray-600 border rounded-lg focus:shadow-outline focus:border-indigo-500"
                       id="gramsInput"
-                      placeholder="Enter amount of grams" // Clear placeholder
+                      placeholder="Enter amount of grams"
                     />
                   </div>
                 </div>
 
                 <div className="mt-6 flex justify-end gap-4">
-                  {" "}
-                  {/* Proper spacing */}
                   <button
                     className="inline-block rounded bg-gray-50 px-4 py-2 text-center text-sm font-semibold text-gray-500 hover:bg-gray-100 focus:shadow-outline"
                     onClick={onClose}
