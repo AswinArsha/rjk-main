@@ -10,10 +10,11 @@ import DownloadButton from "./widgets/DownloadButton";
 import Alerts from "./widgets/Alerts";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+import { supabase } from "./supabase";
 
 const ITEMS_PER_PAGE = 10;
 
-const Table = ({ pointsData, handleClaim, handleDelete }) => {
+const Table = ({ pointsData }) => {
   const [points, setPoints] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [paginatedData, setPaginatedData] = useState([]);
@@ -64,9 +65,9 @@ const Table = ({ pointsData, handleClaim, handleDelete }) => {
       point["ADDRESS3"],
       point["ADDRESS4"],
       point["MOBILE"],
-      point["TOTAL POINTS"],
-      point["CLAIMED POINTS"],
-      point["UNCLAIMED POINTS"],
+      parseFloat(point["TOTAL POINTS"]).toFixed(1), // Format TOTAL POINTS to one decimal place
+      parseFloat(point["CLAIMED POINTS"]).toFixed(1), // Format CLAIMED POINTS to one decimal place
+      parseFloat(point["UNCLAIMED POINTS"]).toFixed(1), // Format UNCLAIMED POINTS to one decimal place
       point["LAST SALES DATE"],
     ]);
 
@@ -90,14 +91,52 @@ const Table = ({ pointsData, handleClaim, handleDelete }) => {
     doc.save("points_table.pdf");
   };
 
-  const handleDataUpdate = (updatedCustomer) => {
+  const handleDataUpdate = async (updatedCustomer) => {
+    try {
+      const { data, error } = await supabase
+        .from("points")
+        .select("*")
+        .order("CUSTOMER CODE", { ascending: true });
+
+      if (error) {
+        throw error;
+      }
+
+      setPoints(data);
+    } catch (error) {
+      console.error("Error fetching updated data:", error.message);
+    }
+  };
+
+  const handleDelete = async (customerCode) => {
+    try {
+      const { error } = await supabase
+        .from("points")
+        .delete()
+        .eq("CUSTOMER CODE", customerCode);
+
+      if (error) {
+        throw error;
+      }
+
+      // Update the local state after successful deletion
+      const updatedPoints = points.filter(
+        (point) => point["CUSTOMER CODE"] !== customerCode
+      );
+      setPoints(updatedPoints);
+    } catch (error) {
+      console.error("Error deleting customer:", error.message);
+    }
+  };
+
+  const handleClaim = (updatedCustomer) => {
     const updatedPoints = points.map((point) => {
       if (point["CUSTOMER CODE"] === updatedCustomer["CUSTOMER CODE"]) {
         return updatedCustomer;
       }
       return point;
     });
-    setPoints(updatedPoints); // Update the table with the new data
+    setPoints(updatedPoints);
   };
 
   return (
@@ -155,19 +194,23 @@ const Table = ({ pointsData, handleClaim, handleDelete }) => {
       <ClaimDialog
         isOpen={isClaimDialogOpen}
         onClose={() => setIsClaimDialogOpen(false)}
-        onConfirmClaim={() => {
-          handleClaim(currentCustomer);
+        onConfirmClaim={(updatedCustomer) => {
+          handleClaim(updatedCustomer);
           setIsClaimDialogOpen(false);
         }}
+        customer={currentCustomer}
       />
 
       <AddGramsDialog
         isOpen={isAddGramsDialogOpen}
+        customer={currentCustomer}
         onClose={() => setIsAddGramsDialogOpen(false)}
-        onConfirm={(grams) => {
-          console.log("Grams added");
+        onConfirm={() => {
           setIsAddGramsDialogOpen(false);
         }}
+        onDataUpdate={handleDataUpdate}
+        points={points}
+        setPoints={setPoints}
       />
 
       <Edit

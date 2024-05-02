@@ -1,28 +1,73 @@
-import React from 'react';
-import { Dialog, Transition } from '@headlessui/react';
-import { Fragment } from 'react';
+import React, { useState } from "react";
+import { Dialog, Transition } from "@headlessui/react";
+import { supabase } from "../supabase";
 
-const ClaimDialog = ({ isOpen, onClose, onConfirm }) => {
+const ClaimDialog = ({ isOpen, onClose, onConfirmClaim, customer }) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleConfirm = async () => {
+    if (customer["UNCLAIMED POINTS"] < 1) {
+      setError("Insufficient unclaimed points to claim.");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const updatedCustomer = {
+        ...customer,
+        "CLAIMED POINTS": parseFloat(customer["CLAIMED POINTS"] || 0) + 1,
+        "UNCLAIMED POINTS": parseFloat(customer["UNCLAIMED POINTS"] || 0) - 1,
+      };
+
+      const { error } = await supabase
+        .from("points")
+        .update({
+          "CLAIMED POINTS": updatedCustomer["CLAIMED POINTS"],
+          "UNCLAIMED POINTS": updatedCustomer["UNCLAIMED POINTS"],
+        })
+        .eq("CUSTOMER CODE", customer["CUSTOMER CODE"]);
+
+      if (error) {
+        throw error;
+      }
+
+      onConfirmClaim(updatedCustomer);
+      onClose();
+    } catch (error) {
+      console.error("Error claiming points:", error.message);
+      setError("Error claiming points. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <Transition appear show={isOpen} as={Fragment}>
+    <Transition appear show={isOpen} as={React.Fragment}>
       <Dialog as="div" className="relative z-10" onClose={onClose}>
         <Transition.Child
-          as="div" // Change to a valid HTML element
-          enter="ease-out duration-300" // Ensure the same duration
-          enterFrom="opacity-0" // Ensure smooth fade-in
+          as={React.Fragment}
+          enter="ease-out duration-300"
+          enterFrom="opacity-0"
           enterTo="opacity-100"
-          leave="ease-in duration-200" // Ensure consistent fade-out
+          leave="ease-in duration-200"
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black bg-opacity-50" /> {/* Background dimming */}
+          <div className="fixed inset-0 bg-black bg-opacity-50" />
         </Transition.Child>
 
-        <Transition.Child
-        
-        >
-          <div className="fixed inset-0 overflow-y-auto">
-            <div className="flex min-h-full items-center justify-center p-4 text-center">
+        <div className="fixed inset-0 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4 text-center">
+            <Transition.Child
+              as={React.Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 scale-95"
+              enterTo="opacity-100 scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 scale-100"
+              leaveTo="opacity-0 scale-95"
+            >
               <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
                 <Dialog.Title
                   as="h3"
@@ -30,31 +75,34 @@ const ClaimDialog = ({ isOpen, onClose, onConfirm }) => {
                 >
                   Confirm Claim
                 </Dialog.Title>
-
                 <div className="mt-2">
                   <p className="text-sm text-gray-600">
                     Are you sure you want to claim these points?
                   </p>
+                  {error && (
+                    <p className="mt-2 text-red-500 text-sm">{error}</p>
+                  )}
                 </div>
-
                 <div className="mt-6 flex justify-end gap-4">
                   <button
                     className="inline-block rounded bg-gray-50 px-4 py-2 text-center text-sm font-semibold text-gray-600 transition-colors duration-150 hover:bg-gray-200"
                     onClick={onClose}
+                    disabled={isLoading}
                   >
                     Cancel
                   </button>
                   <button
-                    className="inline-block rounded bg-green-600 px-4 py-2 text-center text-sm font-semibold text-white transition-colors duration-150 hover:bg-green-700"
-                    onClick={onConfirm}
+                    className="inline-block rounded bg-green-600 px-4 py-2 text-center text-sm font-semibold text-white transition-colors duration-150 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed"
+                    onClick={handleConfirm}
+                    disabled={isLoading}
                   >
-                    Confirm Claim
+                    {isLoading ? "Loading..." : "Confirm Claim"}
                   </button>
                 </div>
               </Dialog.Panel>
-            </div>
+            </Transition.Child>
           </div>
-        </Transition.Child>
+        </div>
       </Dialog>
     </Transition>
   );
