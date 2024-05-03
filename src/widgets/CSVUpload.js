@@ -1,33 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { FaUpload } from "react-icons/fa";
 import Papa from "papaparse";
 import { supabase } from "../supabase";
-import { parse, format, isValid } from "date-fns";
+import { parse, isValid, format } from "date-fns";
 
 const CSVUpload = ({ onUploadSuccess, onAlert }) => {
-  const [alertMessage, setAlertMessage] = useState(null);
-  const [alertType, setAlertType] = useState(null);
-  const [alertTimeout, setAlertTimeout] = useState(null);
-
-  const clearAlert = () => {
-    setAlertMessage(null);
-    setAlertType(null);
-  };
-
-  useEffect(() => {
-    if (alertMessage) {
-      if (alertTimeout) {
-        clearTimeout(alertTimeout); // Clear previous timeout if it exists
-      }
-
-      const timeout = setTimeout(clearAlert, 3000); // 3 seconds timeout
-      setAlertTimeout(timeout);
-    }
-  }, [alertMessage]); // Trigger when alertMessage changes
-
   const handleUpload = async (event) => {
     const file = event.target.files[0];
-
     if (!file) {
       onAlert("No file selected. Please choose a CSV file.", "error");
       return;
@@ -39,39 +18,36 @@ const CSVUpload = ({ onUploadSuccess, onAlert }) => {
         const data = results.data;
 
         const validData = data.filter((row) => {
-          const customerCode = row["CUSTOMER CODE"];
-          return customerCode && !isNaN(parseInt(customerCode, 10)); // Ensure valid customer code
+          const customerCode = parseInt(row["CUSTOMER CODE"], 10);
+          const netWeight = parseFloat(row["NET WEIGHT"]);
+          return !isNaN(customerCode) && !isNaN(netWeight);
         });
 
         if (validData.length === 0) {
           onAlert(
-            "Invalid CSV data. CUSTOMER CODE must not be empty.",
+            "Invalid CSV data. Please check CUSTOMER CODE and NET WEIGHT.",
             "error"
           );
           return;
         }
 
         const convertedData = validData.map((row) => {
+          const customerCode = parseInt(row["CUSTOMER CODE"], 10);
           const netWeight = parseFloat(row["NET WEIGHT"]);
-          const totalPoints = parseFloat((netWeight / 10).toFixed(1)); // Conversion logic
-          const unclaimedPoints = totalPoints;
+          const points = (netWeight / 10).toFixed(1);
+          const unclaimedPoints = parseFloat(points);
 
-          let lastSalesDate = row["LAST SALES DATE"];
-          if (lastSalesDate) {
-            try {
-              const parsedDate = parse(lastSalesDate, "dd-MM-yyyy", new Date());
-              if (isValid(parsedDate)) {
-                lastSalesDate = format(parsedDate, "yyyy-MM-dd");
-              } else {
-                throw new Error("Invalid date format");
-              }
-            } catch (error) {
-              lastSalesDate = null; // Fallback if parsing fails
+          let lastSalesDate = null;
+          const rawDate = row["LAST SALES DATE"];
+          if (rawDate) {
+            const parsedDate = parse(rawDate, "dd-MM-yyyy", new Date());
+            if (isValid(parsedDate)) {
+              lastSalesDate = format(parsedDate, "yyyy-MM-dd");
             }
           }
 
           return {
-            "CUSTOMER CODE": parseInt(row["CUSTOMER CODE"], 10),
+            "CUSTOMER CODE": customerCode,
             "SL NO": row["SL NO"] ? parseInt(row["SL NO"], 10) : null,
             ADDRESS1: row["ADDRESS1"] || "",
             ADDRESS2: row["ADDRESS2"] || "",
@@ -80,7 +56,7 @@ const CSVUpload = ({ onUploadSuccess, onAlert }) => {
             "PIN CODE": row["PIN CODE"] || "",
             PHONE: row["PHONE"] || "",
             MOBILE: row["MOBILE"] || "",
-            "TOTAL POINTS": totalPoints,
+            "TOTAL POINTS": unclaimedPoints,
             "CLAIMED POINTS": 0,
             "UNCLAIMED POINTS": unclaimedPoints,
             "LAST SALES DATE": lastSalesDate,
@@ -88,21 +64,62 @@ const CSVUpload = ({ onUploadSuccess, onAlert }) => {
         });
 
         try {
-          const { error } = await supabase.from("points").insert(convertedData);
+          // Fetch existing points data for customer code check
+          const { data: existingData, error: fetchError } = await supabase
+            .from("points")
+            .select('"CUSTOMER CODE", "TOTAL POINTS", "UNCLAIMED POINTS"');
 
-          if (error) {
-            throw error;
+          if (fetchError) {
+            onAlert("Error fetching existing data.", "error");
+            return;
+          }
+
+          const updatedData = convertedData.map((newRecord) => {
+            const existingRecord = existingData.find(
+              (record) => record["CUSTOMER CODE"] === newRecord["CUSTOMER CODE"]
+            );
+
+            if (existingRecord) {
+              const newTotalPoints = (
+                parseFloat(existingRecord["TOTAL POINTS"]) +
+                parseFloat(newRecord["TOTAL POINTS"])
+              ).toFixed(1);
+
+              const newUnclaimedPoints = (
+                parseFloat(existingRecord["UNCLAIMED POINTS"]) +
+                parseFloat(newRecord["UNCLAIMED POINTS"])
+              ).toFixed(1);
+
+              return {
+                ...newRecord,
+                "TOTAL POINTS": newTotalPoints,
+                "UNCLAIMED POINTS": newUnclaimedPoints,
+              };
+            }
+
+            return newRecord; // If new customer, return as-is
+          });
+
+          // Upsert with conflict resolution
+          const { error: upsertError } = await supabase
+            .from("points")
+            .upsert(updatedData, {
+              onConflict: "CUSTOMER CODE",
+            });
+
+          if (upsertError) {
+            throw upsertError;
           }
 
           onAlert("Data uploaded successfully!", "success");
           if (onUploadSuccess) {
-            onUploadSuccess(convertedData); // Pass new data on success
+            onUploadSuccess(updatedData);
           }
         } catch (error) {
           onAlert("Error uploading data. Please try again.", "error");
         }
       },
-      error: (error) => {
+      error: (parseError) => {
         onAlert("Error parsing CSV. Please check the file format.", "error");
       },
     });

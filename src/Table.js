@@ -18,7 +18,6 @@ const Table = ({ pointsData }) => {
   const [points, setPoints] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [paginatedData, setPaginatedData] = useState([]);
-
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isClaimDialogOpen, setIsClaimDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -27,16 +26,50 @@ const Table = ({ pointsData }) => {
   const [alertMessage, setAlertMessage] = useState(null);
   const [alertType, setAlertType] = useState(null);
 
+  // Handle setting points data on component mount
   useEffect(() => {
     setPoints(pointsData);
   }, [pointsData]);
 
+  // Handle pagination
   useEffect(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const endIndex = currentPage * ITEMS_PER_PAGE;
     setPaginatedData(points.slice(startIndex, endIndex));
   }, [currentPage, points]);
 
+  // Handle real-time updates from Supabase
+  useEffect(() => {
+  // Subscribe to the correct table and schema
+const subscription = supabase
+.channel("realtime-points")
+.on("postgres_changes", { event: "*", schema: "public", table: "points" }, (payload) => {
+  const { eventType, new: newData, old: oldData } = payload;
+
+  if (eventType === "INSERT" || eventType === "UPDATE") {
+    setPoints((prevPoints) => {
+      const updatedPoints = prevPoints.filter(
+        (point) => point["CUSTOMER CODE"] !== newData["CUSTOMER CODE"]
+      );
+      return [...updatedPoints, newData];
+    });
+  } else if (eventType === "DELETE") {
+    setPoints((prevPoints) =>
+      prevPoints.filter(
+        (point) => point["CUSTOMER CODE"] !== oldData["CUSTOMER CODE"]
+      )
+    );
+  }
+})
+.subscribe();
+// Subscribe to the channel
+
+    return () => {
+      supabase.removeChannel(subscription); // Clean up on component unmount
+    };
+  }, []);
+
+  // Pagination controls
   const handlePrevPage = () => {
     if (currentPage > 1) {
       setCurrentPage(currentPage - 1);
@@ -51,11 +84,13 @@ const Table = ({ pointsData }) => {
 
   const totalPages = Math.ceil(points.length / ITEMS_PER_PAGE);
 
+  // Alert handler
   const handleAlert = (message, type) => {
     setAlertMessage(message);
     setAlertType(type);
   };
 
+  // PDF download handler
   const handleDownloadClick = () => {
     const doc = new jsPDF();
     const tableData = points.map((point) => [
@@ -65,9 +100,9 @@ const Table = ({ pointsData }) => {
       point["ADDRESS3"],
       point["ADDRESS4"],
       point["MOBILE"],
-      parseFloat(point["TOTAL POINTS"]).toFixed(1), // Format TOTAL POINTS to one decimal place
-      parseFloat(point["CLAIMED POINTS"]).toFixed(1), // Format CLAIMED POINTS to one decimal place
-      parseFloat(point["UNCLAIMED POINTS"]).toFixed(1), // Format UNCLAIMED POINTS to one decimal place
+      parseFloat(point["TOTAL POINTS"]).toFixed(1),
+      parseFloat(point["CLAIMED POINTS"]).toFixed(1),
+      parseFloat(point["UNCLAIMED POINTS"]).toFixed(1),
       point["LAST SALES DATE"],
     ]);
 
@@ -91,7 +126,7 @@ const Table = ({ pointsData }) => {
     doc.save("points_table.pdf");
   };
 
-  const handleDataUpdate = async (updatedCustomer) => {
+  const handleDataUpdate = async () => {
     try {
       const { data, error } = await supabase
         .from("points")
@@ -120,23 +155,40 @@ const Table = ({ pointsData }) => {
       }
 
       // Update the local state after successful deletion
-      const updatedPoints = points.filter(
-        (point) => point["CUSTOMER CODE"] !== customerCode
+      setPoints((prevPoints) =>
+        prevPoints.filter((point) => point["CUSTOMER CODE"] !== customerCode)
       );
-      setPoints(updatedPoints);
     } catch (error) {
+      handleAlert("Error deleting customer.", "error");
       console.error("Error deleting customer:", error.message);
     }
   };
 
-  const handleClaim = (updatedCustomer) => {
-    const updatedPoints = points.map((point) => {
-      if (point["CUSTOMER CODE"] === updatedCustomer["CUSTOMER CODE"]) {
-        return updatedCustomer;
+  const handleClaim = async (updatedCustomer) => {
+    try {
+      const { error } = await supabase
+        .from("points")
+        .update({
+          "CLAIMED POINTS": updatedCustomer["CLAIMED POINTS"],
+          "UNCLAIMED POINTS": updatedCustomer["UNCLAIMED POINTS"],
+        })
+        .eq("CUSTOMER CODE", updatedCustomer["CUSTOMER CODE"]);
+
+      if (error) {
+        throw error;
       }
-      return point;
-    });
-    setPoints(updatedPoints);
+
+      setPoints((prevPoints) =>
+        prevPoints.map((point) =>
+          point["CUSTOMER CODE"] === updatedCustomer["CUSTOMER CODE"]
+            ? updatedCustomer
+            : point
+        )
+      );
+    } catch (error) {
+      handleAlert("Error claiming points.", "error");
+      console.error("Error claiming points:", error.message);
+    }
   };
 
   return (
@@ -179,7 +231,6 @@ const Table = ({ pointsData }) => {
         totalPages={totalPages}
         onPrev={handlePrevPage}
         onNext={handleNextPage}
-        onJump={(page) => setCurrentPage(page)}
       />
 
       <DeleteDialog
@@ -205,12 +256,7 @@ const Table = ({ pointsData }) => {
         isOpen={isAddGramsDialogOpen}
         customer={currentCustomer}
         onClose={() => setIsAddGramsDialogOpen(false)}
-        onConfirm={() => {
-          setIsAddGramsDialogOpen(false);
-        }}
         onDataUpdate={handleDataUpdate}
-        points={points}
-        setPoints={setPoints}
       />
 
       <Edit
