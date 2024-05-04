@@ -1,11 +1,24 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { FaUpload } from "react-icons/fa";
 import Papa from "papaparse";
 import { supabase } from "../supabase";
 import { parse, isValid, format } from "date-fns";
 
-const CSVUpload = ({ onUploadSuccess, onAlert }) => {
-  const fileInputRef = useRef(); // Reference to reset the file input
+const CSVUpload = ({ onUploadSuccess }) => {
+  const fileInputRef = useRef();
+  const [alertMessage, setAlertMessage] = useState(null);
+  const [alertType, setAlertType] = useState(null);
+
+  const onAlert = (message, type) => {
+    setAlertMessage(message);
+    setAlertType(type);
+
+    // Hide the alert after 2 seconds
+    setTimeout(() => {
+      setAlertMessage(null);
+      setAlertType(null);
+    }, 2000);
+  };
 
   const handleUpload = async (event) => {
     const file = event.target.files[0];
@@ -77,7 +90,6 @@ const CSVUpload = ({ onUploadSuccess, onAlert }) => {
             return;
           }
 
-          // Adjust points for existing customers
           const updatedData = convertedData.map((newRecord) => {
             const existingRecord = existingData.find(
               (record) => record["CUSTOMER CODE"] === newRecord["CUSTOMER CODE"]
@@ -99,12 +111,11 @@ const CSVUpload = ({ onUploadSuccess, onAlert }) => {
                 "TOTAL POINTS": newTotalPoints,
                 "UNCLAIMED POINTS": newUnclaimedPoints,
               };
-            }
+            } 
 
             return newRecord; // If new customer, return as-is
           });
 
-          // Upsert with conflict resolution
           const { error: upsertError } = await supabase
             .from("points")
             .upsert(updatedData, {
@@ -116,8 +127,9 @@ const CSVUpload = ({ onUploadSuccess, onAlert }) => {
           }
 
           onAlert("Data uploaded successfully!", "success");
+
           if (onUploadSuccess) {
-            onUploadSuccess(updatedData);
+            onUploadSuccess(updatedData); // Notify parent component of successful upload
           }
 
           // Reset the file input to allow re-uploading
@@ -134,8 +146,20 @@ const CSVUpload = ({ onUploadSuccess, onAlert }) => {
 
   return (
     <div>
+      {alertMessage && (
+        <div
+          className={`bg-${alertType === "success" ? "green" : "red"}-200 border-${alertType === "success" ? "green" : "red"}-600 text-${alertType === "success" ? "green" : "red"}-600 border-l-4 p-4`}
+          role="alert"
+        >
+          <p className="font-bold">
+            {alertType === "success" ? "Success" : "Error"}
+          </p>
+          <p>{alertMessage}</p>
+        </div>
+      )}
+
       <input
-        ref={fileInputRef} // Attach reference to the file input
+        ref={fileInputRef}
         type="file"
         accept=".csv"
         onChange={handleUpload}

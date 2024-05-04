@@ -61,32 +61,32 @@ const PointsTable = () => {
         if (filter.totalPointsMin) {
           filteredData = filteredData.filter(
             (point) =>
-              parseInt(point["TOTAL POINTS"], 10) >=
-              parseInt(filter.totalPointsMin, 10)
+              parseFloat(point["TOTAL POINTS"]) >=
+              parseFloat(filter.totalPointsMin)
           );
         }
 
         if (filter.totalPointsMax) {
           filteredData = filteredData.filter(
             (point) =>
-              parseInt(point["TOTAL POINTS"], 10) <=
-              parseInt(filter.totalPointsMax, 10)
+              parseFloat(point["TOTAL POINTS"]) <=
+              parseFloat(filter.totalPointsMax)
           );
         }
 
         if (filter.unclaimedPointsMin) {
           filteredData = filteredData.filter(
             (point) =>
-              parseInt(point["UNCLAIMED POINTS"], 10) >=
-              parseInt(filter.unclaimedPointsMin, 10)
+              parseFloat(point["UNCLAIMED POINTS"]) >=
+              parseFloat(filter.unclaimedPointsMin)
           );
         }
 
         if (filter.unclaimedPointsMax) {
           filteredData = filteredData.filter(
             (point) =>
-              parseInt(point["UNCLAIMED POINTS"], 10) <=
-              parseInt(filter.unclaimedPointsMax, 10)
+              parseFloat(point["UNCLAIMED POINTS"]) <=
+              parseFloat(filter.unclaimedPointsMax)
           );
         }
 

@@ -65,8 +65,15 @@ const Table = ({ pointsData, filter }) => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const endIndex = currentPage * ITEMS_PER_PAGE;
     setPaginatedData(filteredData.slice(startIndex, endIndex));
-  }, [currentPage, filteredData]);
 
+    // Reset the current page to 1 when the filtered data changes
+    if (
+      filteredData.length > 0 &&
+      currentPage > Math.ceil(filteredData.length / ITEMS_PER_PAGE)
+    ) {
+      setCurrentPage(1);
+    }
+  }, [currentPage, filteredData]);
   // Handle real-time updates from Supabase
   useEffect(() => {
     const subscription = supabase
@@ -110,11 +117,19 @@ const Table = ({ pointsData, filter }) => {
   const handleNextPage = () => {
     if (currentPage < totalPages) {
       setCurrentPage(currentPage + 1);
+    } else {
+      // Reset to page 1 if the current page exceeds the total pages
+      setCurrentPage(1);
     }
   };
 
   const handleJumpToPage = (page) => {
-    setCurrentPage(page);
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    } else {
+      // Reset to page 1 if the requested page is out of range
+      setCurrentPage(1);
+    }
   };
 
   const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
@@ -230,9 +245,8 @@ const Table = ({ pointsData, filter }) => {
   return (
     <div className="min-h-screen">
       <Alerts alertMessage={alertMessage} alertType={alertType} />
-
       <div className="flex justify-between items-center mb-4">
-        <DownloadButton onClick={handleDownloadClick} />
+        <DownloadButton pointsData={filteredData} />
 
         <CSVUpload
           onUploadSuccess={(newData) => {
