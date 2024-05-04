@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { supabase } from "../supabase";
 
@@ -6,18 +6,30 @@ const ClaimDialog = ({ isOpen, onClose, onConfirmClaim, customer }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  useEffect(() => {
+    if (customer && parseFloat(customer["UNCLAIMED POINTS"]).toFixed(1) < 1) {
+      setError("No points available to claim.");
+    } else {
+      setError(null);
+    }
+  }, [customer]);
+
   const handleConfirm = async () => {
-    if (customer["UNCLAIMED POINTS"] < 1) {
-      setError("Insufficient unclaimed points to claim.");
-      return;
+    if (parseFloat(customer["UNCLAIMED POINTS"]).toFixed(1) < 1) {
+      return; // If there are no points, prevent further action
     }
 
     try {
       setIsLoading(true);
+
       const updatedCustomer = {
         ...customer,
-        "CLAIMED POINTS": parseFloat(customer["CLAIMED POINTS"] || 0) + 1,
-        "UNCLAIMED POINTS": parseFloat(customer["UNCLAIMED POINTS"] || 0) - 1,
+        "CLAIMED POINTS": (parseFloat(customer["CLAIMED POINTS"]) + 1).toFixed(
+          1
+        ),
+        "UNCLAIMED POINTS": (
+          parseFloat(customer["UNCLAIMED POINTS"]) - 1
+        ).toFixed(1),
       };
 
       const { error } = await supabase
@@ -76,11 +88,12 @@ const ClaimDialog = ({ isOpen, onClose, onConfirmClaim, customer }) => {
                   Confirm Claim
                 </Dialog.Title>
                 <div className="mt-2">
-                  <p className="text-sm text-gray-600">
-                    Are you sure you want to claim these points?
-                  </p>
-                  {error && (
-                    <p className="mt-2 text-red-500 text-sm">{error}</p>
+                  {error ? (
+                    <p className="text-sm text-red-500">{error}</p>
+                  ) : (
+                    <p className="text-sm text-gray-600">
+                      Are you sure you want to claim these points?
+                    </p>
                   )}
                 </div>
                 <div className="mt-6 flex justify-end gap-4">
@@ -91,13 +104,15 @@ const ClaimDialog = ({ isOpen, onClose, onConfirmClaim, customer }) => {
                   >
                     Cancel
                   </button>
-                  <button
-                    className="inline-block rounded bg-green-600 px-4 py-2 text-center text-sm font-semibold text-white transition-colors duration-150 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed"
-                    onClick={handleConfirm}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Loading..." : "Confirm Claim"}
-                  </button>
+                  {!error && (
+                    <button
+                      className="inline-block rounded bg-green-600 px-4 py-2 text-center text-sm font-semibold text-white transition-colors duration-150 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed"
+                      onClick={handleConfirm}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "Loading..." : "Confirm Claim"}
+                    </button>
+                  )}
                 </div>
               </Dialog.Panel>
             </Transition.Child>

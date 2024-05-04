@@ -14,8 +14,9 @@ import { supabase } from "./supabase";
 
 const ITEMS_PER_PAGE = 10;
 
-const Table = ({ pointsData }) => {
+const Table = ({ pointsData, filter }) => {
   const [points, setPoints] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [paginatedData, setPaginatedData] = useState([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -31,45 +32,75 @@ const Table = ({ pointsData }) => {
     setPoints(pointsData);
   }, [pointsData]);
 
-  // Handle pagination
+  // Apply filters to the data
+  useEffect(() => {
+    let filtered = points;
+
+    // Apply filters based on the filter object
+    if (filter.customerCode) {
+      filtered = filtered.filter((point) =>
+        point["CUSTOMER CODE"]
+          .toString()
+          .toLowerCase()
+          .includes(filter.customerCode.toLowerCase())
+      );
+    }
+
+    if (filter.address1) {
+      filtered = filtered.filter((point) =>
+        point["ADDRESS1"]
+          .toString()
+          .toLowerCase()
+          .includes(filter.address1.toLowerCase())
+      );
+    }
+
+    // Add the rest of your filter logic here
+
+    setFilteredData(filtered);
+  }, [points, filter]);
+
+  // Handle pagination changes
   useEffect(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const endIndex = currentPage * ITEMS_PER_PAGE;
-    setPaginatedData(points.slice(startIndex, endIndex));
-  }, [currentPage, points]);
+    setPaginatedData(filteredData.slice(startIndex, endIndex));
+  }, [currentPage, filteredData]);
 
   // Handle real-time updates from Supabase
   useEffect(() => {
-  // Subscribe to the correct table and schema
-const subscription = supabase
-.channel("realtime-points")
-.on("postgres_changes", { event: "*", schema: "public", table: "points" }, (payload) => {
-  const { eventType, new: newData, old: oldData } = payload;
+    const subscription = supabase
+      .channel("realtime-points")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "points" },
+        (payload) => {
+          const { eventType, new: newData, old: oldData } = payload;
 
-  if (eventType === "INSERT" || eventType === "UPDATE") {
-    setPoints((prevPoints) => {
-      const updatedPoints = prevPoints.filter(
-        (point) => point["CUSTOMER CODE"] !== newData["CUSTOMER CODE"]
-      );
-      return [...updatedPoints, newData];
-    });
-  } else if (eventType === "DELETE") {
-    setPoints((prevPoints) =>
-      prevPoints.filter(
-        (point) => point["CUSTOMER CODE"] !== oldData["CUSTOMER CODE"]
+          if (eventType === "INSERT" || eventType === "UPDATE") {
+            setPoints((prevPoints) => {
+              const updatedPoints = prevPoints.filter(
+                (point) => point["CUSTOMER CODE"] !== newData["CUSTOMER CODE"]
+              );
+              return [...updatedPoints, newData];
+            });
+          } else if (eventType === "DELETE") {
+            setPoints((prevPoints) =>
+              prevPoints.filter(
+                (point) => point["CUSTOMER CODE"] !== oldData["CUSTOMER CODE"]
+              )
+            );
+          }
+        }
       )
-    );
-  }
-})
-.subscribe();
-// Subscribe to the channel
+      .subscribe();
 
     return () => {
       supabase.removeChannel(subscription); // Clean up on component unmount
     };
   }, []);
 
-  // Pagination controls
+  // Pagination handlers
   const handlePrevPage = () => {
     if (currentPage > 1) {
       setCurrentPage(currentPage - 1);
@@ -82,7 +113,11 @@ const subscription = supabase
     }
   };
 
-  const totalPages = Math.ceil(points.length / ITEMS_PER_PAGE);
+  const handleJumpToPage = (page) => {
+    setCurrentPage(page);
+  };
+
+  const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
 
   // Alert handler
   const handleAlert = (message, type) => {
@@ -93,7 +128,7 @@ const subscription = supabase
   // PDF download handler
   const handleDownloadClick = () => {
     const doc = new jsPDF();
-    const tableData = points.map((point) => [
+    const tableData = paginatedData.map((point) => [
       point["CUSTOMER CODE"],
       point["ADDRESS1"],
       point["ADDRESS2"],
@@ -123,9 +158,11 @@ const subscription = supabase
       ],
       body: tableData,
     });
+
     doc.save("points_table.pdf");
   };
 
+  // Data update handler
   const handleDataUpdate = async () => {
     try {
       const { data, error } = await supabase
@@ -154,7 +191,6 @@ const subscription = supabase
         throw error;
       }
 
-      // Update the local state after successful deletion
       setPoints((prevPoints) =>
         prevPoints.filter((point) => point["CUSTOMER CODE"] !== customerCode)
       );
@@ -195,13 +231,13 @@ const subscription = supabase
     <div className="min-h-screen">
       <Alerts alertMessage={alertMessage} alertType={alertType} />
 
-      <div className="flex flex-wrap justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-4">
         <DownloadButton onClick={handleDownloadClick} />
 
         <CSVUpload
-          onUploadSuccess={(newData) =>
-            setPoints((prev) => [...prev, ...newData])
-          }
+          onUploadSuccess={(newData) => {
+            setPoints((prev) => [...prev, ...newData]);
+          }}
           onAlert={handleAlert}
         />
       </div>
@@ -231,6 +267,7 @@ const subscription = supabase
         totalPages={totalPages}
         onPrev={handlePrevPage}
         onNext={handleNextPage}
+        onJump={handleJumpToPage}
       />
 
       <DeleteDialog

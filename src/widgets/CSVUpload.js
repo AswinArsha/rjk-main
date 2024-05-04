@@ -1,10 +1,12 @@
-import React from "react";
+import React, { useRef } from "react";
 import { FaUpload } from "react-icons/fa";
 import Papa from "papaparse";
 import { supabase } from "../supabase";
 import { parse, isValid, format } from "date-fns";
 
 const CSVUpload = ({ onUploadSuccess, onAlert }) => {
+  const fileInputRef = useRef(); // Reference to reset the file input
+
   const handleUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) {
@@ -17,6 +19,7 @@ const CSVUpload = ({ onUploadSuccess, onAlert }) => {
       complete: async (results) => {
         const data = results.data;
 
+        // Validate and filter data
         const validData = data.filter((row) => {
           const customerCode = parseInt(row["CUSTOMER CODE"], 10);
           const netWeight = parseFloat(row["NET WEIGHT"]);
@@ -64,7 +67,7 @@ const CSVUpload = ({ onUploadSuccess, onAlert }) => {
         });
 
         try {
-          // Fetch existing points data for customer code check
+          // Fetch existing data
           const { data: existingData, error: fetchError } = await supabase
             .from("points")
             .select('"CUSTOMER CODE", "TOTAL POINTS", "UNCLAIMED POINTS"');
@@ -74,6 +77,7 @@ const CSVUpload = ({ onUploadSuccess, onAlert }) => {
             return;
           }
 
+          // Adjust points for existing customers
           const updatedData = convertedData.map((newRecord) => {
             const existingRecord = existingData.find(
               (record) => record["CUSTOMER CODE"] === newRecord["CUSTOMER CODE"]
@@ -115,6 +119,9 @@ const CSVUpload = ({ onUploadSuccess, onAlert }) => {
           if (onUploadSuccess) {
             onUploadSuccess(updatedData);
           }
+
+          // Reset the file input to allow re-uploading
+          fileInputRef.current.value = ""; // This allows re-uploading the same or another CSV file
         } catch (error) {
           onAlert("Error uploading data. Please try again.", "error");
         }
@@ -128,6 +135,7 @@ const CSVUpload = ({ onUploadSuccess, onAlert }) => {
   return (
     <div>
       <input
+        ref={fileInputRef} // Attach reference to the file input
         type="file"
         accept=".csv"
         onChange={handleUpload}

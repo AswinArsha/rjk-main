@@ -155,9 +155,9 @@ const PointsTable = () => {
         onToggle={handleToggleFilters}
         onClear={clearFilters}
       />
-      {showFilters && <PointsFilter filter={filter} setFilter={setFilter} />}{" "}
-      {/* Filter component */}
-      <Table pointsData={pointsData} />
+      {showFilters && <PointsFilter filter={filter} setFilter={setFilter} />}
+      <Table pointsData={pointsData} filter={filter} />{" "}
+      {/* Pass the filter state */}
     </div>
   );
 };

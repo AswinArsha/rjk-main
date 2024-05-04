@@ -1,25 +1,28 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, Fragment } from "react";
 import { Dialog, Transition } from "@headlessui/react";
-import { Fragment } from "react";
 import { supabase } from "../supabase";
-import { FaTimes } from "react-icons/fa";
 
 const AddGramsDialog = ({
   isOpen,
   customer,
   onClose,
-  onConfirm,
-  onDataUpdate,
-  points,
-  setPoints,
+  onDataUpdate, // Receive the onDataUpdate function as a prop
 }) => {
   const [grams, setGrams] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  useEffect(() => {
+    if (isOpen) {
+      // Clear error and reset grams when the dialog is reopened
+      setError(null);
+      setGrams("");
+    }
+  }, [isOpen]);
+
   const handleInputChange = (e) => {
     setGrams(e.target.value);
-    setError(null);
+    setError(null); // Clear error on input change
   };
 
   const handleConfirm = async () => {
@@ -30,54 +33,43 @@ const AddGramsDialog = ({
       return;
     }
 
-    const pointsToAdd = (gramsValue / 10).toFixed(1); // 10:1 conversion ratio, rounded to one decimal place
+    const pointsToAdd = (gramsValue / 10).toFixed(1); // 10:1 ratio, formatted to one decimal place
 
-    try {
-      setIsLoading(true);
-      const updatedCustomer = {
-        ...customer,
-        "TOTAL POINTS": parseFloat(
-          (customer["TOTAL POINTS"] || 0) + parseFloat(pointsToAdd)
-        ).toFixed(1),
-        "UNCLAIMED POINTS": parseFloat(
-          (customer["UNCLAIMED POINTS"] || 0) + parseFloat(pointsToAdd)
-        ).toFixed(1),
-      };
+    setIsLoading(true);
 
-      const { error } = await supabase
-        .from("points")
-        .update({
-          "TOTAL POINTS": updatedCustomer["TOTAL POINTS"],
-          "UNCLAIMED POINTS": updatedCustomer["UNCLAIMED POINTS"],
-        })
-        .eq("CUSTOMER CODE", customer["CUSTOMER CODE"]);
+    const updatedCustomer = {
+      ...customer,
+      "TOTAL POINTS": parseFloat(
+        (customer["TOTAL POINTS"] || 0) + parseFloat(pointsToAdd)
+      ).toFixed(1),
+      "UNCLAIMED POINTS": parseFloat(
+        (customer["UNCLAIMED POINTS"] || 0) + parseFloat(pointsToAdd)
+      ).toFixed(1),
+    };
 
-      if (error) {
-        throw error;
-      }
+    const { error } = await supabase
+      .from("points")
+      .update({
+        "TOTAL POINTS": updatedCustomer["TOTAL POINTS"],
+        "UNCLAIMED POINTS": updatedCustomer["UNCLAIMED POINTS"],
+      })
+      .eq("CUSTOMER CODE", customer["CUSTOMER CODE"]);
 
-      // Update the local state with the updated customer data
-      const updatedPoints = points.map((point) =>
-        point["CUSTOMER CODE"] === updatedCustomer["CUSTOMER CODE"]
-          ? updatedCustomer
-          : point
-      );
-      setPoints(updatedPoints);
-
-      if (onDataUpdate) {
-        onDataUpdate(updatedCustomer);
-      }
-
-      setGrams("");
-      onConfirm(grams);
-      onClose();
-    } catch (error) {
+    if (error) {
       console.error("Error updating grams:", error.message);
-      setError("Error adding grams. Please try again.");
-    } finally {
-      setIsLoading(false);
+    } else {
+      if (onDataUpdate) {
+        onDataUpdate(updatedCustomer); // Call the onDataUpdate function from the parent
+      }
+
+      setGrams(""); // Clear the input
+      setError(null); // Reset the error
+      onClose(); // Close the dialog
     }
+
+    setIsLoading(false);
   };
+
   return (
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-10" onClose={onClose}>
@@ -112,35 +104,33 @@ const AddGramsDialog = ({
                   Add Grams
                 </Dialog.Title>
 
-                <div className="mt-4 space-y-4">
-                  <div className="text-gray-700">
-                    <label className="block mb-1" htmlFor="gramsInput">
-                      Grams to be Added
-                    </label>
-                    <input
-                      type="number"
-                      value={grams}
-                      onChange={handleInputChange}
-                      className="w-full h-10 px-3 text-base placeholder-gray-600 border rounded-lg focus:shadow-outline focus:border-indigo-500"
-                      id="gramsInput"
-                      placeholder="Enter amount of grams"
-                    />
-                    {error && (
-                      <p className="mt-2 text-red-500 text-sm">{error}</p>
-                    )}
-                  </div>
+                <div className="mt-4 text-gray-700">
+                  <label className="block mb-1" htmlFor="gramsInput">
+                    Grams to be Added
+                  </label>
+                  <input
+                    type="number"
+                    value={grams}
+                    onChange={handleInputChange}
+                    className="w-full h-10 px-3 text-base placeholder-gray-600 border rounded-lg focus:border-indigo-500"
+                    id="gramsInput"
+                    placeholder="Enter amount of grams"
+                  />
+                  {error && (
+                    <p className="mt-2 text-red-500 text-sm">{error}</p>
+                  )}
                 </div>
 
                 <div className="mt-6 flex justify-end gap-4">
                   <button
-                    className="inline-block rounded bg-gray-50 px-4 py-2 text-center text-sm font-semibold text-gray-500 hover:bg-gray-100 focus:shadow-outline"
+                    className="inline-block rounded bg-gray-50 px-4 py-2 text-center text-sm font-semibold text-gray-500 hover:bg-gray-100"
                     onClick={onClose}
                     disabled={isLoading}
                   >
                     Cancel
                   </button>
                   <button
-                    className="inline-block rounded bg-yellow-600 px-4 py-2 text-center text-sm font-semibold text-white transition duration-150 hover:bg-yellow-700 disabled:bg-yellow-400 disabled:cursor-not-allowed"
+                    className="inline-block rounded bg-yellow-600 px-4 py-2 text-center text-sm font-semibold text-white transition duration-150 hover:bg-yellow-700"
                     onClick={handleConfirm}
                     disabled={isLoading}
                   >
