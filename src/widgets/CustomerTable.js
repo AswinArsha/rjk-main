@@ -1,4 +1,3 @@
-// src\widgets\CustomerTable.js
 import React from "react";
 import ActionButtons from "./ActionButtons";
 
@@ -8,19 +7,16 @@ const CustomerTable = ({
   onDelete,
   onClaim,
   onAddGrams,
+  isAdmin,
 }) => {
   if (!pointsData || pointsData.length === 0) {
-    return <div className="text-gray-500 p-4">No data available</div>; // Improved "No data" message
+    return <div className="text-gray-500 p-4">No data available</div>;
   }
 
   return (
-    <div className="overflow-x-auto bg-white border border-gray-200 rounded-lg ">
-      {" "}
-      {/* Consistent padding */}
+    <div className="overflow-x-auto bg-white border border-gray-200 rounded-lg">
       <table className="min-w-full divide-y divide-gray-200 text-sm">
         <thead className="bg-gray-300 text-left">
-          {" "}
-          {/* Improved table header styling */}
           <tr>
             {[
               "CUSTOMER CODE",
@@ -33,17 +29,17 @@ const CustomerTable = ({
               "CLAIMED POINTS",
               "UNCLAIMED POINTS",
               "LAST SALES DATE",
-              "Action",
-            ].map((header) => (
-              <th
-                key={header}
-                className="px-4 py-2 border-r border-white font-semibold"
-              >
-                {" "}
-                {/* Consistent borders */}
-                {header}
-              </th>
-            ))}
+              isAdmin ? "Action" : null, // Conditionally render the Action column header
+            ]
+              .filter(Boolean) // Remove falsy values (null) from the array
+              .map((header) => (
+                <th
+                  key={header}
+                  className="px-4 py-2 border-r border-white font-semibold"
+                >
+                  {header}
+                </th>
+              ))}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
@@ -70,17 +66,21 @@ const CustomerTable = ({
                     index < 9 ? "border-r border-gray-200" : ""
                   }`}
                 >
-                  {value || "0"} {/* Default value if undefined */}
+                  {value || "0"}
                 </td>
               ))}
 
-              <ActionButtons
-                point={point}
-                onEdit={onEdit}
-                onDelete={onDelete}
-                onClaim={onClaim}
-                onAddGrams={onAddGrams}
-              />
+              {isAdmin && (
+                <td className="px-4 py-2">
+                  <ActionButtons
+                    point={point}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                    onClaim={onClaim}
+                    onAddGrams={onAddGrams}
+                  />
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

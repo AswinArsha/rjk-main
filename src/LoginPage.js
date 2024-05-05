@@ -1,50 +1,56 @@
-import React, { useState } from 'react';
-import { supabase } from './supabase'; // Import Supabase client instance
+import React, { useState } from "react";
+import { supabase } from "./supabase";
 
-const LoginPage = ({ setAuthenticated }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+const LoginPage = ({ setAuthenticated, setIsAdmin }) => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
   const signIn = async () => {
-    setError(''); // Reset error before attempting sign-in
+    setError(""); // Reset error before attempting sign-in
 
-    if (email.trim() === '' || password.trim() === '') {
-      setError('Email and password are required');
+    if (email.trim() === "" || password.trim() === "") {
+      setError("Email and password are required");
       return;
     }
 
     try {
       const { data, error } = await supabase
-        .from('users')
-        .select('email, password')
-        .eq('email', email.trim())
+        .from("users")
+        .select("email, password, is_admin")
+        .eq("email", email.trim())
         .single();
 
       if (error || !data) {
-        setError('Invalid email or password');
+        setError("Invalid email or password");
         return;
       }
 
       if (data.password !== password.trim()) {
-        setError('Invalid email or password');
+        setError("Invalid email or password");
         return;
       }
 
       setAuthenticated(true);
+      setIsAdmin(data.is_admin); // Set admin status based on login
     } catch (err) {
-      console.error('Error signing in:', err.message);
-      setError('An error occurred during login. Please try again later.');
+      console.error("Error signing in:", err.message);
+      setError("An error occurred during login. Please try again later.");
     }
   };
 
   return (
     <div className="flex justify-center items-center w-screen h-screen p-5 bg-gray-100">
       <div className="bg-white shadow-md rounded-md px-8 pt-6 pb-8 mb-4 flex flex-col w-full md:w-1/3">
-        <h1 className="text-2xl font-semibold mb-4 text-center text-gray-800">Admin Login</h1>
+        <h1 className="text-2xl font-semibold mb-4 text-center text-gray-800">
+          Admin Login
+        </h1>
         <form>
           <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="email">
+            <label
+              className="block text-gray-700 text-sm font-bold mb-2"
+              htmlFor="email"
+            >
               Email <span className="text-red-500">*</span>
             </label>
             <input
@@ -57,7 +63,10 @@ const LoginPage = ({ setAuthenticated }) => {
             />
           </div>
           <div className="mb-6">
-            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">
+            <label
+              className="block text-gray-700 text-sm font-bold mb-2"
+              htmlFor="password"
+            >
               Password <span className="text-red-500">*</span>
             </label>
             <input

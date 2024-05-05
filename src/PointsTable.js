@@ -4,7 +4,7 @@ import Table from "./Table";
 import PointsFilter from "./widgets/PointsFilter";
 import FilterControls from "./widgets/FilterControls";
 
-const PointsTable = () => {
+const PointsTable = ({ isAdmin }) => {
   const [pointsData, setPointsData] = useState([]);
   const [showFilters, setShowFilters] = useState(true);
   const [filter, setFilter] = useState({
@@ -156,8 +156,7 @@ const PointsTable = () => {
         onClear={clearFilters}
       />
       {showFilters && <PointsFilter filter={filter} setFilter={setFilter} />}
-      <Table pointsData={pointsData} filter={filter} />{" "}
-      {/* Pass the filter state */}
+      <Table pointsData={pointsData} filter={filter} isAdmin={isAdmin} />
     </div>
   );
 };
