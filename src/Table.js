@@ -1,16 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import CustomerTable from './widgets/CustomerTable';
-import DeleteDialog from './widgets/DeleteDialog';
-import ClaimDialog from './widgets/ClaimDialog';
-import AddGramsDialog from './widgets/AddGramsDialog';
-import Edit from './widgets/Edit';
-import CSVUpload from './widgets/CSVUpload';
-import Pagination from './widgets/Pagination';
-import DownloadButton from './widgets/DownloadButton';
-import Alerts from './widgets/Alerts';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-import { supabase } from './supabase';
+import React, { useState, useEffect } from "react";
+import CustomerTable from "./widgets/CustomerTable";
+import DeleteDialog from "./widgets/DeleteDialog";
+import ClaimDialog from "./widgets/ClaimDialog";
+import AddGramsDialog from "./widgets/AddGramsDialog";
+import Edit from "./widgets/Edit";
+import CSVUpload from "./widgets/CSVUpload";
+import Pagination from "./widgets/Pagination";
+import DownloadButton from "./widgets/DownloadButton";
+import Alerts from "./widgets/Alerts";
+import EditUserDialog from "./widgets/EditUserDialog";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
+import { supabase } from "./supabase";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -23,6 +24,7 @@ const Table = ({ pointsData, filter, isAdmin }) => {
   const [isClaimDialogOpen, setIsClaimDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isAddGramsDialogOpen, setIsAddGramsDialogOpen] = useState(false);
+  const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
   const [currentCustomer, setCurrentCustomer] = useState(null);
   const [alertMessage, setAlertMessage] = useState(null);
   const [alertType, setAlertType] = useState(null);
@@ -39,7 +41,7 @@ const Table = ({ pointsData, filter, isAdmin }) => {
     // Apply filters based on the filter object
     if (filter.customerCode) {
       filtered = filtered.filter((point) =>
-        point['CUSTOMER CODE']
+        point["CUSTOMER CODE"]
           .toString()
           .toLowerCase()
           .includes(filter.customerCode.toLowerCase())
@@ -48,7 +50,7 @@ const Table = ({ pointsData, filter, isAdmin }) => {
 
     if (filter.address1) {
       filtered = filtered.filter((point) =>
-        point['ADDRESS1']
+        point["ADDRESS1"]
           .toString()
           .toLowerCase()
           .includes(filter.address1.toLowerCase())
@@ -78,24 +80,24 @@ const Table = ({ pointsData, filter, isAdmin }) => {
   // Handle real-time updates from Supabase
   useEffect(() => {
     const subscription = supabase
-      .channel('realtime-points')
+      .channel("realtime-points")
       .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'points' },
+        "postgres_changes",
+        { event: "*", schema: "public", table: "points" },
         (payload) => {
           const { eventType, new: newData, old: oldData } = payload;
 
-          if (eventType === 'INSERT' || eventType === 'UPDATE') {
+          if (eventType === "INSERT" || eventType === "UPDATE") {
             setPoints((prevPoints) => {
               const updatedPoints = prevPoints.filter(
-                (point) => point['CUSTOMER CODE'] !== newData['CUSTOMER CODE']
+                (point) => point["CUSTOMER CODE"] !== newData["CUSTOMER CODE"]
               );
               return [...updatedPoints, newData];
             });
-          } else if (eventType === 'DELETE') {
+          } else if (eventType === "DELETE") {
             setPoints((prevPoints) =>
               prevPoints.filter(
-                (point) => point['CUSTOMER CODE'] !== oldData['CUSTOMER CODE']
+                (point) => point["CUSTOMER CODE"] !== oldData["CUSTOMER CODE"]
               )
             );
           }
@@ -145,46 +147,46 @@ const Table = ({ pointsData, filter, isAdmin }) => {
   const handleDownloadClick = () => {
     const doc = new jsPDF();
     const tableData = paginatedData.map((point) => [
-      point['CUSTOMER CODE'],
-      point['ADDRESS1'],
-      point['ADDRESS2'],
-      point['ADDRESS3'],
-      point['ADDRESS4'],
-      point['MOBILE'],
-      parseFloat(point['TOTAL POINTS']).toFixed(1),
-      parseFloat(point['CLAIMED POINTS']).toFixed(1),
-      parseFloat(point['UNCLAIMED POINTS']).toFixed(1),
-      point['LAST SALES DATE'],
+      point["CUSTOMER CODE"],
+      point["ADDRESS1"],
+      point["ADDRESS2"],
+      point["ADDRESS3"],
+      point["ADDRESS4"],
+      point["MOBILE"],
+      parseFloat(point["TOTAL POINTS"]).toFixed(1),
+      parseFloat(point["CLAIMED POINTS"]).toFixed(1),
+      parseFloat(point["UNCLAIMED POINTS"]).toFixed(1),
+      point["LAST SALES DATE"],
     ]);
 
     doc.autoTable({
       head: [
         [
-          'CUSTOMER CODE',
-          'ADDRESS1',
-          'ADDRESS2',
-          'ADDRESS3',
-          'ADDRESS4',
-          'MOBILE',
-          'TOTAL POINTS',
-          'CLAIMED POINTS',
-          'UNCLAIMED POINTS',
-          'LAST SALES DATE',
+          "CUSTOMER CODE",
+          "ADDRESS1",
+          "ADDRESS2",
+          "ADDRESS3",
+          "ADDRESS4",
+          "MOBILE",
+          "TOTAL POINTS",
+          "CLAIMED POINTS",
+          "UNCLAIMED POINTS",
+          "LAST SALES DATE",
         ],
       ],
       body: tableData,
     });
 
-    doc.save('points_table.pdf');
+    doc.save("points_table.pdf");
   };
 
   // Data update handler
   const handleDataUpdate = async () => {
     try {
       const { data, error } = await supabase
-        .from('points')
-        .select('*')
-        .order('CUSTOMER CODE', { ascending: true });
+        .from("points")
+        .select("*")
+        .order("CUSTOMER CODE", { ascending: true });
 
       if (error) {
         throw error;
@@ -192,39 +194,39 @@ const Table = ({ pointsData, filter, isAdmin }) => {
 
       setPoints(data);
     } catch (error) {
-      console.error('Error fetching updated data:', error.message);
+      console.error("Error fetching updated data:", error.message);
     }
   };
 
   const handleDelete = async (customerCode) => {
     try {
       const { error } = await supabase
-        .from('points')
+        .from("points")
         .delete()
-        .eq('CUSTOMER CODE', customerCode);
+        .eq("CUSTOMER CODE", customerCode);
 
       if (error) {
         throw error;
       }
 
       setPoints((prevPoints) =>
-        prevPoints.filter((point) => point['CUSTOMER CODE'] !== customerCode)
+        prevPoints.filter((point) => point["CUSTOMER CODE"] !== customerCode)
       );
     } catch (error) {
-      handleAlert('Error deleting customer.', 'error');
-      console.error('Error deleting customer:', error.message);
+      handleAlert("Error deleting customer.", "error");
+      console.error("Error deleting customer:", error.message);
     }
   };
 
   const handleClaim = async (updatedCustomer) => {
     try {
       const { error } = await supabase
-        .from('points')
+        .from("points")
         .update({
-          'CLAIMED POINTS': updatedCustomer['CLAIMED POINTS'],
-          'UNCLAIMED POINTS': updatedCustomer['UNCLAIMED POINTS'],
+          "CLAIMED POINTS": updatedCustomer["CLAIMED POINTS"],
+          "UNCLAIMED POINTS": updatedCustomer["UNCLAIMED POINTS"],
         })
-        .eq('CUSTOMER CODE', updatedCustomer['CUSTOMER CODE']);
+        .eq("CUSTOMER CODE", updatedCustomer["CUSTOMER CODE"]);
 
       if (error) {
         throw error;
@@ -232,14 +234,14 @@ const Table = ({ pointsData, filter, isAdmin }) => {
 
       setPoints((prevPoints) =>
         prevPoints.map((point) =>
-          point['CUSTOMER CODE'] === updatedCustomer['CUSTOMER CODE']
+          point["CUSTOMER CODE"] === updatedCustomer["CUSTOMER CODE"]
             ? updatedCustomer
             : point
         )
       );
     } catch (error) {
-      handleAlert('Error claiming points.', 'error');
-      console.error('Error claiming points:', error.message);
+      handleAlert("Error claiming points.", "error");
+      console.error("Error claiming points:", error.message);
     }
   };
 
@@ -267,19 +269,29 @@ const Table = ({ pointsData, filter, isAdmin }) => {
   return (
     <div className="min-h-screen">
       <Alerts alertMessage={alertMessage} alertType={alertType} />
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex  space-x-4 mb-4">
         <DownloadButton
           pointsData={filteredData}
           onDownload={handleDownloadClick}
         />
 
         {isAdmin && (
-          <CSVUpload
-            onUploadSuccess={(newData) => {
-              setPoints((prev) => [...prev, ...newData]);
-            }}
-            onAlert={handleAlert}
-          />
+          <>
+            <CSVUpload
+              onUploadSuccess={(newData) => {
+                setPoints((prev) => [...prev, ...newData]);
+              }}
+              onAlert={handleAlert}
+            />
+
+            {/* Button to open the Edit User Dialog */}
+            <button
+              onClick={() => setIsEditUserDialogOpen(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded"
+            >
+              Edit Users
+            </button>
+          </>
         )}
       </div>
 
@@ -304,7 +316,7 @@ const Table = ({ pointsData, filter, isAdmin }) => {
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirmDelete={() => {
-          handleDelete(currentCustomer['CUSTOMER CODE']);
+          handleDelete(currentCustomer["CUSTOMER CODE"]);
           setIsDeleteDialogOpen(false);
         }}
       />
@@ -332,6 +344,14 @@ const Table = ({ pointsData, filter, isAdmin }) => {
         onClose={() => setIsEditDialogOpen(false)}
         onDataUpdate={handleDataUpdate}
       />
+
+      {/* Edit User Dialog */}
+      {isAdmin && (
+        <EditUserDialog
+          isOpen={isEditUserDialogOpen}
+          onClose={() => setIsEditUserDialogOpen(false)}
+        />
+      )}
     </div>
   );
 };

@@ -6,24 +6,15 @@ import { parse, isValid, format } from "date-fns";
 
 const CSVUpload = ({ onUploadSuccess }) => {
   const fileInputRef = useRef();
-  const [alertMessage, setAlertMessage] = useState(null);
-  const [alertType, setAlertType] = useState(null);
-
-  const onAlert = (message, type) => {
-    setAlertMessage(message);
-    setAlertType(type);
-
-    // Hide the alert after 2 seconds
-    setTimeout(() => {
-      setAlertMessage(null);
-      setAlertType(null);
-    }, 2000);
-  };
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const handleUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) {
-      onAlert("No file selected. Please choose a CSV file.", "error");
+      setErrorMessage("No file selected. Please choose a CSV file.");
+      setShowErrorModal(true);
       return;
     }
 
@@ -40,10 +31,10 @@ const CSVUpload = ({ onUploadSuccess }) => {
         });
 
         if (validData.length === 0) {
-          onAlert(
-            "Invalid CSV data. Please check CUSTOMER CODE and NET WEIGHT.",
-            "error"
+          setErrorMessage(
+            "Invalid CSV data. Please check CUSTOMER CODE and NET WEIGHT."
           );
+          setShowErrorModal(true);
           return;
         }
 
@@ -80,14 +71,12 @@ const CSVUpload = ({ onUploadSuccess }) => {
         });
 
         try {
-          // Fetch existing data
           const { data: existingData, error: fetchError } = await supabase
             .from("points")
             .select('"CUSTOMER CODE", "TOTAL POINTS", "UNCLAIMED POINTS"');
 
           if (fetchError) {
-            onAlert("Error fetching existing data.", "error");
-            return;
+            throw fetchError;
           }
 
           const updatedData = convertedData.map((newRecord) => {
@@ -111,7 +100,7 @@ const CSVUpload = ({ onUploadSuccess }) => {
                 "TOTAL POINTS": newTotalPoints,
                 "UNCLAIMED POINTS": newUnclaimedPoints,
               };
-            } 
+            }
 
             return newRecord; // If new customer, return as-is
           });
@@ -126,7 +115,7 @@ const CSVUpload = ({ onUploadSuccess }) => {
             throw upsertError;
           }
 
-          onAlert("Data uploaded successfully!", "success");
+          setShowSuccessModal(true);
 
           if (onUploadSuccess) {
             onUploadSuccess(updatedData); // Notify parent component of successful upload
@@ -135,26 +124,146 @@ const CSVUpload = ({ onUploadSuccess }) => {
           // Reset the file input to allow re-uploading
           fileInputRef.current.value = ""; // This allows re-uploading the same or another CSV file
         } catch (error) {
-          onAlert("Error uploading data. Please try again.", "error");
+          setErrorMessage("Error uploading data. Please try again.");
+          setShowErrorModal(true);
         }
       },
       error: (parseError) => {
-        onAlert("Error parsing CSV. Please check the file format.", "error");
+        setErrorMessage("Error parsing CSV. Please check the file format.");
+        setShowErrorModal(true);
       },
     });
   };
 
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false);
+  };
+
+  const handleErrorModalClose = () => {
+    setShowErrorModal(false);
+  };
+
   return (
     <div>
-      {alertMessage && (
-        <div
-          className={`bg-${alertType === "success" ? "green" : "red"}-200 border-${alertType === "success" ? "green" : "red"}-600 text-${alertType === "success" ? "green" : "red"}-600 border-l-4 p-4`}
-          role="alert"
-        >
-          <p className="font-bold">
-            {alertType === "success" ? "Success" : "Error"}
-          </p>
-          <p>{alertMessage}</p>
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed z-10 inset-0 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen"></span>
+            &#8203;
+            <div
+              className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="modal-headline"
+            >
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <svg
+                      className="h-6 w-6 text-green-600"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  </div>
+                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                    <h3
+                      className="text-lg leading-6 font-medium text-gray-900"
+                      id="modal-headline"
+                    >
+                      Data Upload Success
+                    </h3>
+                    <div className="mt-2">
+                      <p className="text-sm leading-5 text-gray-500">
+                        The data has been successfully uploaded.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={handleSuccessModalClose}
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Modal */}
+      {showErrorModal && (
+        <div className="fixed z-10 inset-0 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen"></span>
+            &#8203;
+            <div
+              className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="modal-headline"
+            >
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <svg
+                      className="h-6 w-6 text-red-600"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M12 9l-3 3m0 0l3 3m-3-3h7"
+                      />
+                    </svg>
+                  </div>
+                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                    <h3
+                      className="text-lg leading-6 font-medium text-gray-900"
+                      id="modal-headline"
+                    >
+                      Data Upload Error
+                    </h3>
+                    <div className="mt-2">
+                      <p className="text-sm leading-5 text-gray-500">
+                        {errorMessage}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={handleErrorModalClose}
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
