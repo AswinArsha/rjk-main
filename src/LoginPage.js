@@ -39,55 +39,66 @@ const LoginPage = ({ setAuthenticated, setIsAdmin }) => {
     }
   };
 
+  const handleKeyDown = (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault(); // Prevent default behavior
+      signIn(); // Trigger login
+    }
+  };
+
   return (
     <div className="flex justify-center items-center w-screen h-screen p-5 bg-gray-100">
-      <div className="bg-white shadow-md rounded-md px-8 pt-6 pb-8 mb-4 flex flex-col w-full md:w-1/3">
-        <h1 className="text-2xl font-semibold mb-4 text-center text-gray-800">
-          Admin Login
+      <div className="bg-white shadow-lg rounded-lg px-8 pt-6 pb-8 mb-4 flex flex-col w-full md:w-1/3">
+        <h1 className="text-3xl font-semibold mb-4 text-center text-gray-800">
+          Sign In
         </h1>
-        <form>
+        <form onKeyDown={handleKeyDown}>
+          {" "}
+          {/* Handle Enter key */}
           <div className="mb-4">
             <label
-              className="block text-gray-700 text-sm font-bold mb-2"
+              className="block text-gray-700 text-sm font-semibold mb-2"
               htmlFor="email"
             >
               Email <span className="text-red-500">*</span>
             </label>
             <input
-              className="shadow appearance-none border rounded-md w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              className="shadow border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:border-indigo-500 transition duration-150"
               id="email"
               type="email"
-              placeholder="email"
+              placeholder="Enter your email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              required
             />
           </div>
           <div className="mb-6">
             <label
-              className="block text-gray-700 text-sm font-bold mb-2"
+              className="block text-gray-700 text-sm font-semibold mb-2"
               htmlFor="password"
             >
               Password <span className="text-red-500">*</span>
             </label>
             <input
-              className="shadow appearance-none border rounded-md w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              className="shadow border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:border-indigo-500 transition duration-150"
               id="password"
               type="password"
-              placeholder="***********"
+              placeholder="Enter your password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              required
             />
           </div>
           <div className="flex items-center justify-between">
             <button
-              className="bg-green-500 hover:bg-green-700 text-white w-full font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline"
               type="button"
               onClick={signIn}
             >
               Login
             </button>
           </div>
-          {error && <p className="text-red-500 text-center mt-4">{error}</p>}
+          {error && <p className="text-red-600 text-center mt-4">{error}</p>}
         </form>
       </div>
     </div>
